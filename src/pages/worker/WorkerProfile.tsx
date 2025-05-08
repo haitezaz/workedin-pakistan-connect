@@ -107,8 +107,11 @@ const WorkerProfilePage = () => {
       // Join worker_skill and skill tables to get skill names
       const { data: skillsData, error: skillsError } = await supabase
         .from('worker_skill')
-        .select('skill_id, skill!inner(skillname)')
-        .eq('worker_id', workerId);
+        .select(`
+          skillid,
+          skill:skill_id(skillname)
+        `)
+        .eq('workerid', workerId);
         
       if (skillsError) {
         console.error('Error fetching skills:', skillsError);
@@ -117,7 +120,15 @@ const WorkerProfilePage = () => {
       
       if (skillsData && skillsData.length > 0) {
         // Extract skill names from the joined query
-        const skills = skillsData.map(item => item.skill.skillname);
+        const skills = skillsData
+          .filter(item => item.skill && typeof item.skill === 'object')
+          .map(item => {
+            // Type assertion to safely access skillname
+            const skillObj = item.skill as { skillname?: string };
+            return skillObj.skillname || '';
+          })
+          .filter(skillName => skillName !== ''); // Filter out empty skill names
+          
         setProfile(prev => ({ ...prev, skills: skills }));
       }
     } catch (error) {

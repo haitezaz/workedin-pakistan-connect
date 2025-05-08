@@ -40,7 +40,23 @@ const Register = () => {
       // Register with auth context
       await register({ name, email, phone, cnic, role }, password);
       
-      // Also create record in the appropriate table based on role
+      // Prepare phone and CNIC as numbers or null
+      let phoneNumber = null;
+      let cnicNumber = null;
+      
+      try {
+        if (phone) phoneNumber = parseInt(phone.replace(/\D/g, ''), 10);
+      } catch (err) {
+        console.warn('Unable to parse phone number', err);
+      }
+      
+      try {
+        if (cnic) cnicNumber = parseInt(cnic.replace(/\D/g, ''), 10);
+      } catch (err) {
+        console.warn('Unable to parse CNIC', err);
+      }
+      
+      // Create record in the appropriate table based on role
       if (role === 'worker') {
         const { error: workerError } = await supabase
           .from('worker')
@@ -48,8 +64,8 @@ const Register = () => {
             { 
               name, 
               email,
-              phonenumber: phone ? parseInt(phone, 10) : null,
-              cnic: cnic ? parseInt(cnic, 10) : null,
+              phonenumber: phoneNumber,
+              cnic: cnicNumber,
               availabilitystatus: 'active',
               hourlyrate: 0
             }
@@ -70,8 +86,8 @@ const Register = () => {
             { 
               name, 
               email,
-              phonenumber: phone ? parseInt(phone, 10) : null,
-              cnic: cnic ? parseInt(cnic, 10) : null
+              phonenumber: phoneNumber,
+              cnic: cnicNumber
             }
           ]);
           

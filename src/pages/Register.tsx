@@ -9,6 +9,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/types/auth';
 import Layout from '@/components/layout/Layout';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/sonner';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -21,29 +23,73 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>('worker');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsSubmitting(true);
     
     if (password !== confirmPassword) {
       setError('Passwords do not match');
+      setIsSubmitting(false);
       return;
     }
     
     try {
+      // Register with auth context
       await register({ name, email, phone, cnic, role }, password);
       
-      // Redirect based on role
+      // Also create record in the appropriate table based on role
       if (role === 'worker') {
+        const { error: workerError } = await supabase
+          .from('worker')
+          .insert([
+            { 
+              name, 
+              email,
+              phonenumber: phone ? parseInt(phone, 10) : null,
+              cnic: cnic ? parseInt(cnic, 10) : null,
+              availabilitystatus: 'active',
+              hourlyrate: 0
+            }
+          ]);
+          
+        if (workerError) {
+          console.error('Error creating worker record:', workerError);
+          toast.error('Registration successful but there was an issue setting up your worker profile. Please update your profile.');
+        } else {
+          toast.success('Worker profile created successfully!');
+        }
+        
         navigate('/worker/profile');
       } else if (role === 'employer') {
+        const { error: employerError } = await supabase
+          .from('employer')
+          .insert([
+            { 
+              name, 
+              email,
+              phonenumber: phone ? parseInt(phone, 10) : null,
+              cnic: cnic ? parseInt(cnic, 10) : null
+            }
+          ]);
+          
+        if (employerError) {
+          console.error('Error creating employer record:', employerError);
+          toast.error('Registration successful but there was an issue setting up your employer profile. Please update your profile.');
+        } else {
+          toast.success('Employer profile created successfully!');
+        }
+        
         navigate('/employer/dashboard');
       } else {
         navigate('/');
       }
     } catch (err) {
+      console.error('Registration error:', err);
       setError('Registration failed. Please try again.');
+      setIsSubmitting(false);
     }
   };
 
@@ -139,9 +185,9 @@ const Register = () => {
               <Button 
                 type="submit" 
                 className="w-full bg-workedIn-blue hover:bg-workedIn-blue/90"
-                disabled={isLoading}
+                disabled={isLoading || isSubmitting}
               >
-                {isLoading ? 'Processing...' : 'Register'}
+                {isLoading || isSubmitting ? 'Processing...' : 'Register'}
               </Button>
               
               <div className="text-center text-sm">

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -89,7 +88,7 @@ const mockJobApplications = [
     workerId: '201',
     workerName: 'Ahmed Khan',
     skills: ['MS Office', 'Administration', 'Customer Service'],
-    message: 'I have 2 years of experience as an administrative assistant and am proficient in all MS Office applications.',
+    message: "I have 2 years of experience as an administrative assistant and am proficient in all MS Office applications.",
     status: 'pending'
   },
   {
@@ -98,7 +97,7 @@ const mockJobApplications = [
     workerId: '202',
     workerName: 'Sara Ali',
     skills: ['MS Office', 'Filing', 'Data Entry'],
-    message: 'I've worked in office administration for the past 3 years and would be a great fit for this position.',
+    message: "I have worked in office administration for the past 3 years and would be a great fit for this position.",
     status: 'pending'
   }
 ];
@@ -111,7 +110,7 @@ const mockGigApplications = [
     workerName: 'Imran Malik',
     skills: ['Plumbing', 'Repair', 'Maintenance'],
     proposedPrice: 2200,
-    remarks: 'I'm an experienced plumber and can fix your issues quickly. I have all necessary tools.',
+    remarks: "I am an experienced plumber and can fix your issues quickly. I have all necessary tools.",
     status: 'pending'
   },
   {
@@ -121,7 +120,7 @@ const mockGigApplications = [
     workerName: 'Yasir Shah',
     skills: ['Plumbing', 'Repair'],
     proposedPrice: 2800,
-    remarks: 'I have 5 years experience fixing all types of plumbing issues. I guarantee quality work.',
+    remarks: "I have 5 years experience fixing all types of plumbing issues. I guarantee quality work.",
     status: 'pending'
   }
 ];

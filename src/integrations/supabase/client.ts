@@ -17,11 +17,15 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Add global logging for debugging purposes
-supabase.from('worker')
-  .on('*', payload => {
-    console.log('Change received from worker table!', payload);
-  })
+// Add global logging for debugging purposes using the channel API instead
+const channel = supabase.channel('schema-db-changes')
+  .on(
+    'postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'worker' },
+    payload => {
+      console.log('Change received from worker table!', payload);
+    }
+  )
   .subscribe();
 
 // Add utility function to help with error handling

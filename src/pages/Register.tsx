@@ -45,20 +45,32 @@ const Register = () => {
       let cnicNumber = null;
       
       try {
-        if (phone) phoneNumber = parseInt(phone.replace(/\D/g, ''), 10);
+        if (phone) {
+          // Remove all non-numeric characters and parse as integer
+          const cleanPhone = phone.replace(/\D/g, '');
+          if (cleanPhone) phoneNumber = parseInt(cleanPhone, 10);
+        }
       } catch (err) {
-        console.warn('Unable to parse phone number', err);
+        console.error('Unable to parse phone number', err);
       }
       
       try {
-        if (cnic) cnicNumber = parseInt(cnic.replace(/\D/g, ''), 10);
+        if (cnic) {
+          // Remove all non-numeric characters and parse as integer
+          const cleanCnic = cnic.replace(/\D/g, '');
+          if (cleanCnic) cnicNumber = parseInt(cleanCnic, 10);
+        }
       } catch (err) {
-        console.warn('Unable to parse CNIC', err);
+        console.error('Unable to parse CNIC', err);
       }
+      
+      console.log('Creating record with data:', { 
+        name, email, phoneNumber, cnicNumber, role 
+      });
       
       // Create record in the appropriate table based on role
       if (role === 'worker') {
-        const { error: workerError } = await supabase
+        const { data: workerData, error: workerError } = await supabase
           .from('worker')
           .insert([
             { 
@@ -69,18 +81,20 @@ const Register = () => {
               availabilitystatus: 'active',
               hourlyrate: 0
             }
-          ]);
+          ])
+          .select();
           
         if (workerError) {
           console.error('Error creating worker record:', workerError);
           toast.error('Registration successful but there was an issue setting up your worker profile. Please update your profile.');
         } else {
+          console.log('Worker data saved successfully:', workerData);
           toast.success('Worker profile created successfully!');
         }
         
         navigate('/worker/profile');
       } else if (role === 'employer') {
-        const { error: employerError } = await supabase
+        const { data: employerData, error: employerError } = await supabase
           .from('employer')
           .insert([
             { 
@@ -89,12 +103,14 @@ const Register = () => {
               phonenumber: phoneNumber,
               cnic: cnicNumber
             }
-          ]);
+          ])
+          .select();
           
         if (employerError) {
           console.error('Error creating employer record:', employerError);
           toast.error('Registration successful but there was an issue setting up your employer profile. Please update your profile.');
         } else {
+          console.log('Employer data saved successfully:', employerData);
           toast.success('Employer profile created successfully!');
         }
         

@@ -2,6 +2,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { AuthContextType, UserProfile, UserRole } from '@/types/auth';
 import { toast } from "@/components/ui/sonner";
+import { supabase } from '@/integrations/supabase/client';
 
 // Mock function to simulate API calls - replace with actual API calls later
 const mockAuthAPI = {
@@ -87,11 +88,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string, role: UserRole) => {
     setIsLoading(true);
     try {
+      console.log("Logging in with:", { email, role });
+      // Check if user exists in the relevant table
+      let userExists = false;
+      
+      if (role === 'worker') {
+        const { data: worker } = await supabase
+          .from('worker')
+          .select('*')
+          .eq('email', email)
+          .maybeSingle();
+        userExists = !!worker;
+      } else if (role === 'employer') {
+        const { data: employer } = await supabase
+          .from('employer')
+          .select('*')
+          .eq('email', email)
+          .maybeSingle();
+        userExists = !!employer;
+      } else if (role === 'admin') {
+        const { data: admin } = await supabase
+          .from('admin')
+          .select('*')
+          .eq('email', email)
+          .maybeSingle();
+        userExists = !!admin;
+      }
+      
+      // For now, use mock auth since we don't have real auth implemented
       const userData = await mockAuthAPI.login(email, password, role);
+      
+      // If user doesn't exist in the database but passed mock auth, create one
+      if (!userExists) {
+        console.log("User doesn't exist in database, creating...");
+        if (role === 'worker') {
+          await supabase
+            .from('worker')
+            .insert([
+              { 
+                name: userData.name, 
+                email: userData.email,
+                phonenumber: userData.phone ? parseInt(userData.phone.replace(/\D/g, ''), 10) : null,
+                cnic: userData.cnic ? parseInt(userData.cnic.replace(/\D/g, ''), 10) : null,
+                availabilitystatus: 'active',
+                hourlyrate: 0
+              }
+            ]);
+        } else if (role === 'employer') {
+          await supabase
+            .from('employer')
+            .insert([
+              { 
+                name: userData.name, 
+                email: userData.email,
+                phonenumber: userData.phone ? parseInt(userData.phone.replace(/\D/g, ''), 10) : null,
+                cnic: userData.cnic ? parseInt(userData.cnic.replace(/\D/g, ''), 10) : null
+              }
+            ]);
+        }
+      }
+      
       setUser(userData);
       localStorage.setItem('workedIn_user', JSON.stringify(userData));
       toast.success("Login successful!");
     } catch (error) {
+      console.error("Login error:", error);
       toast.error("Login failed. Please check your credentials.");
       throw error;
     } finally {
@@ -102,11 +163,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (userData: Partial<UserProfile>, password: string) => {
     setIsLoading(true);
     try {
+      console.log("Registering user:", userData);
+      // For now, use mock auth since we don't have real auth implemented
       const newUser = await mockAuthAPI.register(userData, password);
       setUser(newUser);
       localStorage.setItem('workedIn_user', JSON.stringify(newUser));
       toast.success("Registration successful!");
     } catch (error) {
+      console.error("Registration error:", error);
       toast.error("Registration failed. Please try again.");
       throw error;
     } finally {

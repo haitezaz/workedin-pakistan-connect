@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,7 +58,8 @@ const WorkerProfilePage = () => {
 
   // Fetch worker profile data on component mount
   useEffect(() => {
-    if (user?.id) {
+    if (user?.email) {
+      console.log("Fetching worker profile for email:", user.email);
       fetchWorkerProfile();
     }
   }, [user]);
@@ -65,6 +67,7 @@ const WorkerProfilePage = () => {
   // Fetch worker profile from Supabase
   const fetchWorkerProfile = async () => {
     try {
+      console.log("Starting worker profile fetch");
       // Check if worker exists in the worker table
       const { data: workerData, error: workerError } = await supabase
         .from('worker')
@@ -76,6 +79,8 @@ const WorkerProfilePage = () => {
         console.error('Error fetching worker:', workerError);
         return;
       }
+      
+      console.log("Worker data fetched:", workerData);
       
       if (workerData) {
         // Worker exists, update local state with fetched data
@@ -104,6 +109,7 @@ const WorkerProfilePage = () => {
   // Fetch worker skills
   const fetchWorkerSkills = async (workerId: number) => {
     try {
+      console.log("Fetching skills for worker ID:", workerId);
       // Join worker_skill and skill tables to get skill names
       const { data: skillsData, error: skillsError } = await supabase
         .from('worker_skill')
@@ -118,6 +124,8 @@ const WorkerProfilePage = () => {
         return;
       }
       
+      console.log("Skills data fetched:", skillsData);
+      
       if (skillsData && skillsData.length > 0) {
         // Extract skill names from the joined query
         const skills = skillsData
@@ -129,6 +137,7 @@ const WorkerProfilePage = () => {
           })
           .filter(skillName => skillName !== ''); // Filter out empty skill names
           
+        console.log("Processed skills:", skills);
         setProfile(prev => ({ ...prev, skills: skills }));
       }
     } catch (error) {
@@ -139,6 +148,7 @@ const WorkerProfilePage = () => {
   // Fetch worker education
   const fetchWorkerEducation = async (workerId: number) => {
     try {
+      console.log("Fetching education for worker ID:", workerId);
       const { data: educationData, error: educationError } = await supabase
         .from('worker_education')
         .select('*')
@@ -148,6 +158,8 @@ const WorkerProfilePage = () => {
         console.error('Error fetching education:', educationError);
         return;
       }
+      
+      console.log("Education data fetched:", educationData);
       
       if (educationData && educationData.length > 0) {
         // Map database education to our Education type
@@ -177,6 +189,8 @@ const WorkerProfilePage = () => {
     setIsLoading(true);
     
     try {
+      console.log("Updating profile with data:", profile);
+      
       // First, check if worker exists
       const { data: existingWorker, error: checkError } = await supabase
         .from('worker')
@@ -192,23 +206,43 @@ const WorkerProfilePage = () => {
       }
       
       let workerId: number;
+      let phoneNumber = null;
+      let cnicNumber = null;
+      
+      try {
+        if (profile.phone) {
+          const cleanPhone = profile.phone.replace(/\D/g, '');
+          if (cleanPhone) phoneNumber = parseInt(cleanPhone, 10);
+        }
+      } catch (err) {
+        console.warn("Error parsing phone number:", err);
+      }
+      
+      try {
+        if (profile.cnic) {
+          const cleanCnic = profile.cnic.replace(/\D/g, '');
+          if (cleanCnic) cnicNumber = parseInt(cleanCnic, 10);
+        }
+      } catch (err) {
+        console.warn("Error parsing CNIC:", err);
+      }
       
       // If worker doesn't exist, create a new one
       if (!existingWorker) {
+        console.log("Creating new worker record");
         const { data: newWorker, error: insertError } = await supabase
           .from('worker')
           .insert([
             { 
               name: profile.name,
               email: profile.email,
-              phonenumber: profile.phone ? parseInt(profile.phone, 10) : null,
-              cnic: profile.cnic ? parseInt(profile.cnic, 10) : null,
+              phonenumber: phoneNumber,
+              cnic: cnicNumber,
               hourlyrate: profile.hourlyRate,
               availabilitystatus: profile.availability
             }
           ])
-          .select('workerid')
-          .single();
+          .select();
           
         if (insertError) {
           console.error('Error creating worker:', insertError);
@@ -217,17 +251,19 @@ const WorkerProfilePage = () => {
           return;
         }
         
-        workerId = newWorker.workerid;
+        workerId = newWorker?.[0]?.workerid;
+        console.log("New worker created with ID:", workerId);
       } else {
         // Update existing worker
         workerId = existingWorker.workerid;
+        console.log("Updating existing worker with ID:", workerId);
         
         const { error: updateError } = await supabase
           .from('worker')
           .update({ 
             name: profile.name,
-            phonenumber: profile.phone ? parseInt(profile.phone, 10) : null,
-            cnic: profile.cnic ? parseInt(profile.cnic, 10) : null,
+            phonenumber: phoneNumber,
+            cnic: cnicNumber,
             hourlyrate: profile.hourlyRate,
             availabilitystatus: profile.availability
           })
@@ -252,6 +288,7 @@ const WorkerProfilePage = () => {
       }
       
       toast.success('Profile updated successfully!');
+      fetchWorkerProfile(); // Refresh data
     } catch (error) {
       console.error('Error updating profile:', error);
       toast.error('An error occurred while updating profile');
@@ -263,6 +300,7 @@ const WorkerProfilePage = () => {
   // Update worker skills
   const updateWorkerSkills = async (workerId: number, skills: string[]) => {
     try {
+      console.log("Updating skills for worker ID:", workerId, "Skills:", skills);
       // First, get all skill IDs or create new ones
       const skillIds = [];
       for (const skillName of skills) {
@@ -281,23 +319,24 @@ const WorkerProfilePage = () => {
         let skillId;
         if (existingSkill) {
           skillId = existingSkill.skillid;
+          console.log(`Found existing skill "${skillName}" with ID:`, skillId);
         } else {
           // Create new skill
           const { data: newSkill, error: skillInsertError } = await supabase
             .from('skill')
             .insert([{ skillname: skillName }])
-            .select('skillid')
-            .single();
+            .select();
             
           if (skillInsertError) {
             console.error('Error creating skill:', skillInsertError);
             continue;
           }
           
-          skillId = newSkill.skillid;
+          skillId = newSkill?.[0]?.skillid;
+          console.log(`Created new skill "${skillName}" with ID:`, skillId);
         }
         
-        skillIds.push(skillId);
+        if (skillId) skillIds.push(skillId);
       }
       
       // Delete all existing worker_skill entries for this worker
@@ -317,12 +356,15 @@ const WorkerProfilePage = () => {
           skillid: skillid
         }));
         
-        const { error: insertError } = await supabase
+        console.log("Inserting worker skills:", skillEntries);
+        const { data: newWorkerSkills, error: insertError } = await supabase
           .from('worker_skill')
           .insert(skillEntries);
           
         if (insertError) {
           console.error('Error adding worker skills:', insertError);
+        } else {
+          console.log("Skills assigned to worker successfully");
         }
       }
     } catch (error) {
@@ -333,6 +375,7 @@ const WorkerProfilePage = () => {
   // Update worker education
   const updateWorkerEducation = async (workerId: number, education: Education[]) => {
     try {
+      console.log("Updating education for worker ID:", workerId, "Education:", education);
       // Delete all existing worker_education entries for this worker
       const { error: deleteError } = await supabase
         .from('worker_education')
@@ -351,12 +394,15 @@ const WorkerProfilePage = () => {
           scoredpercentage: 0 // Default value since we don't have this in the UI
         }));
         
-        const { error: insertError } = await supabase
+        console.log("Inserting worker education:", educationEntries);
+        const { data: newWorkerEdu, error: insertError } = await supabase
           .from('worker_education')
           .insert(educationEntries);
           
         if (insertError) {
           console.error('Error adding worker education:', insertError);
+        } else {
+          console.log("Education added to worker successfully");
         }
       }
     } catch (error) {

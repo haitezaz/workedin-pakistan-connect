@@ -16,3 +16,17 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+// Add global logging for debugging purposes
+supabase.from('worker')
+  .on('*', payload => {
+    console.log('Change received from worker table!', payload);
+  })
+  .subscribe();
+
+// Add utility function to help with error handling
+export const handleSupabaseError = (error: any) => {
+  console.error('Supabase error:', error);
+  const message = error.message || 'An unknown error occurred';
+  return message;
+};

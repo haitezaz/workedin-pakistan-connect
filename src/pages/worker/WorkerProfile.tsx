@@ -43,7 +43,13 @@ const WorkerProfilePage = () => {
   });
 
   // Add new education form state
-  const [newEducation, setNewEducation] = useState({
+  const [newEducation, setNewEducation] = useState<{
+    institution: string;
+    degree: string;
+    fieldOfStudy: string;
+    startYear: number;
+    endYear: number | string;
+  }>({
     institution: '',
     degree: '',
     fieldOfStudy: '',
@@ -115,7 +121,7 @@ const WorkerProfilePage = () => {
         .from('worker_skill')
         .select(`
           skillid,
-          skill:skill_id(skillname)
+          skill:skillid(skillname)
         `)
         .eq('workerid', workerId);
         
@@ -357,7 +363,7 @@ const WorkerProfilePage = () => {
         }));
         
         console.log("Inserting worker skills:", skillEntries);
-        const { data: newWorkerSkills, error: insertError } = await supabase
+        const { error: insertError } = await supabase
           .from('worker_skill')
           .insert(skillEntries);
           
@@ -395,7 +401,7 @@ const WorkerProfilePage = () => {
         }));
         
         console.log("Inserting worker education:", educationEntries);
-        const { data: newWorkerEdu, error: insertError } = await supabase
+        const { error: insertError } = await supabase
           .from('worker_education')
           .insert(educationEntries);
           
@@ -434,10 +440,16 @@ const WorkerProfilePage = () => {
 
   // Add education to the profile
   const handleAddEducation = () => {
-    if (newEducation.institution && newEducation.degree && newEducation.fieldOfStudy) {
+    if (newEducation.institution && newEducation.degree) {
       const education: Education = {
         id: Math.random().toString(36).substr(2, 9),
-        ...newEducation
+        institution: newEducation.institution,
+        degree: newEducation.degree,
+        fieldOfStudy: newEducation.fieldOfStudy || '',
+        startYear: newEducation.startYear,
+        endYear: typeof newEducation.endYear === 'string' && newEducation.endYear === '' 
+          ? new Date().getFullYear() 
+          : Number(newEducation.endYear)
       };
       
       setProfile({
@@ -490,6 +502,7 @@ const WorkerProfilePage = () => {
     return years;
   };
 
+  // Component rendering
   return (
     <Layout>
       <div className="container-custom my-8">
@@ -509,7 +522,7 @@ const WorkerProfilePage = () => {
                     <Label htmlFor="name">Full Name</Label>
                     <Input 
                       id="name" 
-                      value={profile.name} 
+                      value={profile.name || ''} 
                       onChange={(e) => setProfile({...profile, name: e.target.value})} 
                     />
                   </div>
@@ -518,7 +531,7 @@ const WorkerProfilePage = () => {
                     <Input 
                       id="email" 
                       type="email" 
-                      value={profile.email} 
+                      value={profile.email || ''} 
                       onChange={(e) => setProfile({...profile, email: e.target.value})} 
                       readOnly
                     />
@@ -527,7 +540,7 @@ const WorkerProfilePage = () => {
                     <Label htmlFor="phone">Phone</Label>
                     <Input 
                       id="phone" 
-                      value={profile.phone} 
+                      value={profile.phone || ''} 
                       onChange={(e) => setProfile({...profile, phone: e.target.value})} 
                     />
                   </div>
@@ -535,7 +548,7 @@ const WorkerProfilePage = () => {
                     <Label htmlFor="cnic">CNIC</Label>
                     <Input 
                       id="cnic" 
-                      value={profile.cnic} 
+                      value={profile.cnic || ''} 
                       onChange={(e) => setProfile({...profile, cnic: e.target.value})} 
                     />
                   </div>
@@ -701,8 +714,8 @@ const WorkerProfilePage = () => {
                           <div>
                             <Label htmlFor="endYear">End Year</Label>
                             <Select 
-                              value={newEducation.endYear.toString()} 
-                              onValueChange={(value) => setNewEducation({...newEducation, endYear: Number(value)})}
+                              value={typeof newEducation.endYear === 'number' ? newEducation.endYear.toString() : newEducation.endYear} 
+                              onValueChange={(value) => setNewEducation({...newEducation, endYear: value === '' ? '' : Number(value)})}
                             >
                               <SelectTrigger id="endYear">
                                 <SelectValue placeholder="End Year" />

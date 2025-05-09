@@ -17,7 +17,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Add global logging for debugging purposes using the channel API instead
+// Add global logging for debugging purposes using the channel API
 const channel = supabase.channel('schema-db-changes')
   .on(
     'postgres_changes',

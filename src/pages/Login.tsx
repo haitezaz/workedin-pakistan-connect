@@ -9,32 +9,66 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/types/auth';
 import Layout from '@/components/layout/Layout';
+import { toast } from "@/components/ui/sonner";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, isAuthenticated, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('worker');
   const [error, setError] = useState('');
 
+  // If already authenticated, redirect to appropriate dashboard
+  React.useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === 'worker') {
+        navigate('/worker/jobs');
+      } else if (user.role === 'employer') {
+        navigate('/employer/dashboard');
+      } else if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      }
+    }
+  }, [isAuthenticated, user, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
+    if (!email) {
+      setError('Email is required');
+      return;
+    }
+    
+    if (!password) {
+      setError('Password is required');
+      return;
+    }
+    
     try {
+      toast.loading("Logging in...", { id: "login" });
       await login(email, password, role);
+      toast.dismiss("login");
       
-      // Redirect based on role
-      if (role === 'worker') {
-        navigate('/worker/jobs');
-      } else if (role === 'employer') {
-        navigate('/employer/dashboard');
-      } else if (role === 'admin') {
-        navigate('/admin/dashboard');
-      }
-    } catch (err) {
-      setError('Invalid credentials. Please try again.');
+      // Redirect based on role (handled in useEffect)
+    } catch (err: any) {
+      toast.dismiss("login");
+      setError(err.message || 'Invalid credentials. Please try again.');
+    }
+  };
+
+  // Helper function to provide test credentials
+  const fillTestCredentials = () => {
+    if (role === 'worker') {
+      setEmail('worker@test.com');
+      setPassword('password');
+    } else if (role === 'employer') {
+      setEmail('employer@test.com');
+      setPassword('password');
+    } else if (role === 'admin') {
+      setEmail('admin@test.com');
+      setPassword('password');
     }
   };
 
@@ -98,6 +132,17 @@ const Login = () => {
               >
                 {isLoading ? 'Logging In...' : 'Login'}
               </Button>
+              
+              <div className="text-center text-sm mt-2">
+                <Button 
+                  variant="link" 
+                  type="button" 
+                  onClick={fillTestCredentials}
+                  className="p-0 h-auto font-normal text-workedIn-blue"
+                >
+                  Use test account
+                </Button>
+              </div>
               
               <div className="text-center text-sm">
                 <span className="text-gray-500">Don't have an account?</span>{' '}

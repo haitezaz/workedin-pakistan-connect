@@ -18,15 +18,22 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 });
 
 // Add global logging for debugging purposes using the channel API
-const channel = supabase.channel('schema-db-changes')
-  .on(
-    'postgres_changes',
-    { event: 'INSERT', schema: 'public', table: 'worker' },
-    payload => {
-      console.log('Change received from worker table!', payload);
-    }
-  )
-  .subscribe();
+// Only set up the channel if we're in a browser environment
+if (typeof window !== 'undefined') {
+  try {
+    const channel = supabase.channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'worker' },
+        payload => {
+          console.log('Change received from worker table!', payload);
+        }
+      )
+      .subscribe();
+  } catch (error) {
+    console.error('Error setting up Supabase realtime channel:', error);
+  }
+}
 
 // Add utility function to help with error handling
 export const handleSupabaseError = (error: any) => {

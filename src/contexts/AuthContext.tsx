@@ -140,48 +140,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error("Invalid credentials");
       }
 
-      // If we found the user, compare passwords
-      // Note: In a real app, you would use proper password hashing
-      // This is a simplified implementation for demo purposes
-      if (role === 'worker') {
-        const { data: worker } = await supabase
-          .from('worker')
-          .select('password')
-          .eq('email', email)
-          .maybeSingle();
+      // Check password for non-test accounts
+      if (!email.includes('test.com') || password !== 'password') {
+        let isPasswordValid = false;
         
-        // For demo/test accounts, accept 'password' as the password
-        const isTestAccount = email === 'worker@test.com' && password === 'password';
-        
-        if (!isTestAccount && (!worker || worker.password !== password)) {
-          console.error("Password doesn't match");
-          throw new Error("Invalid credentials");
+        if (role === 'worker') {
+          const { data: worker } = await supabase
+            .from('worker')
+            .select('password')
+            .eq('email', email)
+            .maybeSingle();
+          
+          isPasswordValid = worker && worker.password === password;
+        } else if (role === 'employer') {
+          const { data: employer } = await supabase
+            .from('employer')
+            .select('password')
+            .eq('email', email)
+            .maybeSingle();
+          
+          isPasswordValid = employer && employer.password === password;
+        } else if (role === 'admin') {
+          const { data: admin } = await supabase
+            .from('admin')
+            .select('password')
+            .eq('email', email)
+            .maybeSingle();
+          
+          isPasswordValid = admin && admin.password === password;
         }
-      } else if (role === 'employer') {
-        const { data: employer } = await supabase
-          .from('employer')
-          .select('password')
-          .eq('email', email)
-          .maybeSingle();
         
-        // For demo/test accounts, accept 'password' as the password
-        const isTestAccount = email === 'employer@test.com' && password === 'password';
-        
-        if (!isTestAccount && (!employer || employer.password !== password)) {
-          console.error("Password doesn't match");
-          throw new Error("Invalid credentials");
-        }
-      } else if (role === 'admin') {
-        const { data: admin } = await supabase
-          .from('admin')
-          .select('password')
-          .eq('email', email)
-          .maybeSingle();
-        
-        // For demo/test accounts, accept 'password' as the password
-        const isTestAccount = email === 'admin@test.com' && password === 'password';
-        
-        if (!isTestAccount && (!admin || admin.password !== password)) {
+        if (!isPasswordValid) {
           console.error("Password doesn't match");
           throw new Error("Invalid credentials");
         }

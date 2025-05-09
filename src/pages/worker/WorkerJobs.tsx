@@ -159,7 +159,7 @@ const WorkerJobs = () => {
                 <SelectValue placeholder="Select City" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Cities</SelectItem>
+                <SelectItem value="all">All Cities</SelectItem>
                 {mockCities.map(city => (
                   <SelectItem key={city.id} value={city.name}>{city.name}</SelectItem>
                 ))}
@@ -170,7 +170,7 @@ const WorkerJobs = () => {
                 <SelectValue placeholder="Job Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="full-time">Full Time</SelectItem>
                 <SelectItem value="part-time">Part Time</SelectItem>
                 <SelectItem value="contract">Contract</SelectItem>

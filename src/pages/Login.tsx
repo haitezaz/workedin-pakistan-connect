@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,8 +20,9 @@ const Login = () => {
   const [error, setError] = useState('');
 
   // If already authenticated, redirect to appropriate dashboard
-  React.useEffect(() => {
+  useEffect(() => {
     if (isAuthenticated && user) {
+      console.log("User is authenticated, redirecting to appropriate dashboard", user);
       if (user.role === 'worker') {
         navigate('/worker/jobs');
       } else if (user.role === 'employer') {
@@ -51,9 +52,11 @@ const Login = () => {
       await login(email, password, role);
       toast.dismiss("login");
       
-      // Redirect based on role (handled in useEffect)
+      // Redirect will be handled by the useEffect above
+      console.log("Login successful, user should be redirected by useEffect");
     } catch (err: any) {
       toast.dismiss("login");
+      toast.error(err.message || 'Invalid credentials. Please try again.');
       setError(err.message || 'Invalid credentials. Please try again.');
     }
   };

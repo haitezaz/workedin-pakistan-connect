@@ -5,135 +5,197 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Layout from '@/components/layout/Layout';
-import { Job, JobType } from '@/types/jobs';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase, formatCurrency, getSkillsForEntity } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
-// Mock data
-const mockCities = [
-  { id: '1', name: 'Karachi' },
-  { id: '2', name: 'Lahore' },
-  { id: '3', name: 'Islamabad' },
-  { id: '4', name: 'Peshawar' },
-  { id: '5', name: 'Quetta' },
-  { id: '6', name: 'Multan' },
-  { id: '7', name: 'Faisalabad' },
-  { id: '8', name: 'Rawalpindi' }
-];
-
-const mockJobs: Job[] = [
-  {
-    id: '1',
-    title: 'Electrician for Office Wiring',
-    description: 'Looking for a skilled electrician to do complete wiring for our new office space. Must have at least 5 years of experience and bring own tools.',
-    salary: 25000,
-    location: 'DHA Phase 5',
-    city: 'Karachi',
-    jobType: 'full-time',
-    requiredSkills: ['Electrical Wiring', 'Circuit Installation'],
-    employerId: '101',
-    employerName: 'Alpha Construction Co.',
-    status: 'open',
-    createdAt: '2023-05-01'
-  },
-  {
-    id: '2',
-    title: 'Part-time Driver',
-    description: 'Need a professional driver for weekday mornings to drop children to school. Must have valid license and clean driving record.',
-    salary: 15000,
-    location: 'Bahria Town',
-    city: 'Lahore',
-    jobType: 'part-time',
-    requiredSkills: ['Driving', 'Navigation'],
-    employerId: '102',
-    employerName: 'Ahmed Family',
-    status: 'open',
-    createdAt: '2023-05-02'
-  },
-  {
-    id: '3',
-    title: 'Construction Site Supervisor',
-    description: 'Overseeing construction activities at our residential project. Need someone with experience in building supervision and team management.',
-    salary: 45000,
-    location: 'Gulberg',
-    city: 'Lahore',
-    jobType: 'full-time',
-    requiredSkills: ['Construction Management', 'Team Leadership'],
-    employerId: '103',
-    employerName: 'Builders Associates',
-    status: 'open',
-    createdAt: '2023-05-03'
-  },
-  {
-    id: '4',
-    title: 'Office Assistant',
-    description: 'Looking for an office assistant to handle administrative tasks, filing, and basic computer operations.',
-    salary: 20000,
-    location: 'Blue Area',
-    city: 'Islamabad',
-    jobType: 'full-time',
-    requiredSkills: ['MS Office', 'Filing', 'Administration'],
-    employerId: '104',
-    employerName: 'Tech Solutions Inc.',
-    status: 'open',
-    createdAt: '2023-05-04'
-  },
-  {
-    id: '5',
-    title: 'Security Guard',
-    description: 'Need a security guard for night shifts at our warehouse. Previous experience in security preferred.',
-    salary: 18000,
-    location: 'Korangi Industrial Area',
-    city: 'Karachi',
-    jobType: 'full-time',
-    requiredSkills: ['Security', 'Vigilance'],
-    employerId: '105',
-    employerName: 'Secure Solutions',
-    status: 'open',
-    createdAt: '2023-05-05'
-  }
-];
+// Define Job type based on our database structure
+interface Job {
+  jobid: number;
+  jobtitle: string;
+  jobdescription: string;
+  jobsalary: number;
+  joblocation: string;
+  city: string;
+  jobtype: string;
+  requiredSkills: string[];
+  empid: number;
+  employerName: string;
+  status: string;
+  timestamp: string;
+}
 
 const WorkerJobs = () => {
   const [selectedCity, setSelectedCity] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedJobType, setSelectedJobType] = useState<JobType | ''>('');
+  const [selectedJobType, setSelectedJobType] = useState<string>('');
   const [applicationJob, setApplicationJob] = useState<Job | null>(null);
   const [applicationMessage, setApplicationMessage] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { user } = useAuth();
 
-  // Filter jobs based on selected filters
-  const filteredJobs = mockJobs.filter(job => {
-    return (
-      (selectedCity === '' || job.city === selectedCity) &&
-      (selectedJobType === '' || job.jobType === selectedJobType) &&
-      (searchTerm === '' || 
-        job.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        job.description.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+  // Fetch cities from Supabase
+  const { data: cities = [], isLoading: citiesLoading } = useQuery({
+    queryKey: ['cities'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job')
+        .select('city')
+        .order('city')
+        .eq('status', 'open');
+      
+      if (error) {
+        console.error('Error fetching cities:', error);
+        toast.error('Failed to load cities');
+        throw error;
+      }
+      
+      // Filter out duplicates and null values
+      const uniqueCities = [...new Set(data.map(item => item.city).filter(Boolean))];
+      return uniqueCities.map((name, index) => ({ id: index.toString(), name }));
+    }
   });
 
-  const handleApply = () => {
+  // Fetch jobs from Supabase
+  const { data: jobs = [], isLoading, error } = useQuery({
+    queryKey: ['jobs', selectedCity, selectedJobType, searchTerm],
+    queryFn: async () => {
+      let query = supabase
+        .from('job')
+        .select(`
+          *,
+          employer:empid(name)
+        `)
+        .eq('status', 'open');
+      
+      // Apply filters if selected
+      if (selectedCity) {
+        query = query.eq('city', selectedCity);
+      }
+      
+      if (selectedJobType) {
+        query = query.eq('jobtype', selectedJobType);
+      }
+
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching jobs:', error);
+        toast.error('Failed to load jobs');
+        throw error;
+      }
+      
+      // Format the jobs data with skills
+      return Promise.all(data.map(async (job) => {
+        // Get skills for this job
+        const skills = await getSkillsForEntity(job.jobid, 'job');
+        
+        return {
+          jobid: job.jobid,
+          jobtitle: job.jobtitle || 'Untitled Job',
+          jobdescription: job.jobdescription || 'No description available',
+          jobsalary: job.jobsalary || 0,
+          joblocation: job.joblocation || 'Location not provided',
+          city: job.city || 'City not specified',
+          jobtype: job.jobtype || 'full-time',
+          requiredSkills: skills,
+          empid: job.empid,
+          employerName: job.employer?.name || 'Unknown Employer',
+          status: job.status || 'open',
+          timestamp: job.timestamp || new Date().toISOString()
+        };
+      }));
+    }
+  });
+
+  // Filter jobs based on search term
+  const filteredJobs = jobs.filter(job => {
+    return searchTerm === '' || 
+      job.jobtitle.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      job.jobdescription.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  const handleApply = async () => {
+    if (!user) {
+      toast.error('You need to be logged in to apply for jobs');
+      return;
+    }
+
     if (applicationMessage.trim() === '') {
       toast.error('Please enter a message to apply');
       return;
     }
     
-    toast.success('Application submitted successfully!');
-    setApplicationMessage('');
-    setIsDialogOpen(false);
+    try {
+      // First get the worker ID
+      const { data: workerData, error: workerError } = await supabase
+        .from('worker')
+        .select('workerid')
+        .eq('email', user.email)
+        .single();
+
+      if (workerError) throw workerError;
+      
+      if (!workerData || !workerData.workerid) {
+        toast.error('Worker profile not found');
+        return;
+      }
+
+      // Check if already applied
+      const { data: existingApplication, error: checkError } = await supabase
+        .from('job_worker_applied')
+        .select('*')
+        .eq('workerid', workerData.workerid)
+        .eq('jobid', applicationJob?.jobid)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      if (existingApplication) {
+        toast.error('You have already applied for this job');
+        setIsDialogOpen(false);
+        return;
+      }
+
+      // Submit the application
+      const { error: submitError } = await supabase
+        .from('job_worker_applied')
+        .insert({
+          jobid: applicationJob?.jobid,
+          workerid: workerData.workerid,
+          messageofinterest: applicationMessage,
+          timestamp: new Date().toISOString()
+        });
+
+      if (submitError) throw submitError;
+      
+      toast.success('Application submitted successfully!');
+      setApplicationMessage('');
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      toast.error('Failed to submit application');
+    }
   };
 
-  // Format salary
-  const formatSalary = (amount: number) => {
-    return new Intl.NumberFormat('en-PK', { 
-      style: 'currency', 
-      currency: 'PKR',
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
+  if (error) {
+    return (
+      <Layout>
+        <div className="container-custom my-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-4">Find Jobs</h1>
+            <Card className="p-6">
+              <p className="text-red-500">Error loading jobs. Please try again later.</p>
+            </Card>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -159,18 +221,18 @@ const WorkerJobs = () => {
                 <SelectValue placeholder="Select City" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Cities</SelectItem>
-                {mockCities.map(city => (
+                <SelectItem value="">All Cities</SelectItem>
+                {cities.map(city => (
                   <SelectItem key={city.id} value={city.name}>{city.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Select value={selectedJobType} onValueChange={(value) => setSelectedJobType(value as JobType | '')}>
+            <Select value={selectedJobType} onValueChange={setSelectedJobType}>
               <SelectTrigger>
                 <SelectValue placeholder="Job Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="">All Types</SelectItem>
                 <SelectItem value="full-time">Full Time</SelectItem>
                 <SelectItem value="part-time">Part Time</SelectItem>
                 <SelectItem value="contract">Contract</SelectItem>
@@ -181,7 +243,13 @@ const WorkerJobs = () => {
           
           {/* Jobs Listing */}
           <div className="space-y-4">
-            {filteredJobs.length === 0 ? (
+            {isLoading ? (
+              <Card>
+                <CardContent className="py-10 text-center">
+                  <p className="text-gray-500">Loading jobs...</p>
+                </CardContent>
+              </Card>
+            ) : filteredJobs.length === 0 ? (
               <Card>
                 <CardContent className="py-10 text-center">
                   <p className="text-gray-500">No jobs found matching your criteria.</p>
@@ -189,28 +257,28 @@ const WorkerJobs = () => {
               </Card>
             ) : (
               filteredJobs.map(job => (
-                <Card key={job.id} className="card-shadow hover:border-workedIn-blue transition-colors">
+                <Card key={job.jobid} className="card-shadow hover:border-workedIn-blue transition-colors">
                   <CardHeader className="pb-2">
                     <div className="flex flex-col md:flex-row md:justify-between md:items-start">
-                      <CardTitle>{job.title}</CardTitle>
+                      <CardTitle>{job.jobtitle}</CardTitle>
                       <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
                         <Badge variant="secondary" className="bg-workedIn-lightBlue text-workedIn-blue">
                           {job.city}
                         </Badge>
                         <Badge variant="outline" className="capitalize">
-                          {job.jobType.replace('-', ' ')}
+                          {job.jobtype.replace('-', ' ')}
                         </Badge>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="mb-4">
-                      <p className="text-gray-600 mb-2">{job.description}</p>
-                      <p className="font-semibold text-workedIn-blue">{formatSalary(job.salary)}/month</p>
+                      <p className="text-gray-600 mb-2">{job.jobdescription}</p>
+                      <p className="font-semibold text-workedIn-blue">{formatCurrency(job.jobsalary)}/month</p>
                     </div>
                     
                     <div className="mb-4">
-                      <p className="text-sm text-gray-500">Location: {job.location}, {job.city}</p>
+                      <p className="text-sm text-gray-500">Location: {job.joblocation}, {job.city}</p>
                       <p className="text-sm text-gray-500">Posted by: {job.employerName}</p>
                     </div>
                     
@@ -223,7 +291,7 @@ const WorkerJobs = () => {
                     </div>
                     
                     <div className="flex justify-end">
-                      <Dialog open={isDialogOpen && applicationJob?.id === job.id} onOpenChange={(open) => {
+                      <Dialog open={isDialogOpen && applicationJob?.jobid === job.jobid} onOpenChange={(open) => {
                         if (open) {
                           setApplicationJob(job);
                           setIsDialogOpen(true);
@@ -236,7 +304,7 @@ const WorkerJobs = () => {
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Apply for {job.title}</DialogTitle>
+                            <DialogTitle>Apply for {job.jobtitle}</DialogTitle>
                             <DialogDescription>
                               Send your application for this job opportunity.
                             </DialogDescription>

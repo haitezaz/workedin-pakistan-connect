@@ -75,32 +75,44 @@ export const formatDate = (dateString: string) => {
 };
 
 // Utility to get skills for a specific entity (job or gig)
+// Rewriting this function to avoid the type instantiation depth error
 export const getSkillsForEntity = async (entityId: number, entityType: 'job' | 'gig') => {
   try {
+    // Determine table name and ID column name based on entity type
     const tableName = entityType === 'job' ? 'skill_job' : 'skill_gig';
     const idColumnName = entityType === 'job' ? 'jobid' : 'gigid';
     
+    // Get skill IDs associated with the entity
     const { data: skillLinks, error: linksError } = await supabase
       .from(tableName)
       .select('skillid')
       .eq(idColumnName, entityId);
     
-    if (linksError) throw linksError;
+    if (linksError) {
+      console.error(`Error fetching ${entityType} skill links:`, linksError);
+      return [];
+    }
     
     if (!skillLinks || skillLinks.length === 0) {
       return [];
     }
     
+    // Extract skill IDs from the links
     const skillIds = skillLinks.map(link => link.skillid);
     
+    // Get skill names from the skill table
     const { data: skillData, error: skillsError } = await supabase
       .from('skill')
       .select('skillname')
       .in('skillid', skillIds);
       
-    if (skillsError) throw skillsError;
+    if (skillsError) {
+      console.error(`Error fetching skills:`, skillsError);
+      return [];
+    }
     
-    return skillData?.map(s => s.skillname) || [];
+    // Extract skill names
+    return skillData ? skillData.map(s => s.skillname) : [];
   } catch (error) {
     console.error(`Error getting skills for ${entityType} ${entityId}:`, error);
     return [];

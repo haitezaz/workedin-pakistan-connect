@@ -29,6 +29,20 @@ if (typeof window !== 'undefined') {
           console.log('Change received from worker table!', payload);
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'gigs' },
+        payload => {
+          console.log('Change received from gigs table!', payload);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'job' },
+        payload => {
+          console.log('Change received from job table!', payload);
+        }
+      )
       .subscribe();
   } catch (error) {
     console.error('Error setting up Supabase realtime channel:', error);
@@ -40,4 +54,55 @@ export const handleSupabaseError = (error: any) => {
   console.error('Supabase error:', error);
   const message = error.message || 'An unknown error occurred';
   return message;
+};
+
+// Format currency (PKR)
+export const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-PK', { 
+    style: 'currency', 
+    currency: 'PKR',
+    maximumFractionDigits: 0
+  }).format(amount);
+};
+
+// Format date
+export const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-PK', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+// Utility to get skills for a specific entity (job or gig)
+export const getSkillsForEntity = async (entityId: number, entityType: 'job' | 'gig') => {
+  try {
+    const tableName = entityType === 'job' ? 'skill_job' : 'skill_gig';
+    const idColumnName = entityType === 'job' ? 'jobid' : 'gigid';
+    
+    const { data: skillLinks, error: linksError } = await supabase
+      .from(tableName)
+      .select('skillid')
+      .eq(idColumnName, entityId);
+    
+    if (linksError) throw linksError;
+    
+    if (!skillLinks || skillLinks.length === 0) {
+      return [];
+    }
+    
+    const skillIds = skillLinks.map(link => link.skillid);
+    
+    const { data: skillData, error: skillsError } = await supabase
+      .from('skill')
+      .select('skillname')
+      .in('skillid', skillIds);
+      
+    if (skillsError) throw skillsError;
+    
+    return skillData?.map(s => s.skillname) || [];
+  } catch (error) {
+    console.error(`Error getting skills for ${entityType} ${entityId}:`, error);
+    return [];
+  }
 };

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, formatCurrency, getSkillsForEntity } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 
 interface Gig {
@@ -37,17 +37,20 @@ const WorkerGigs = () => {
   const { user } = useAuth();
 
   // Fetch cities from Supabase
-  const { data: cities = [] } = useQuery({
+  const { data: cities = [], isLoading: citiesLoading } = useQuery({
     queryKey: ['cities'],
     queryFn: async () => {
-      // Get unique cities from gigs table
       const { data, error } = await supabase
         .from('gigs')
         .select('city')
         .order('city')
         .eq('status', 'open');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching cities:', error);
+        toast.error('Failed to load cities');
+        throw error;
+      }
       
       // Filter out duplicates and null values
       const uniqueCities = [...new Set(data.map(item => item.city).filter(Boolean))];
@@ -74,29 +77,17 @@ const WorkerGigs = () => {
 
       const { data, error } = await query;
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching gigs:', error);
+        toast.error('Failed to load gigs');
+        throw error;
+      }
       
-      // Format the gigs data
+      // Format the gigs data with skills
       return Promise.all(data.map(async (gig) => {
         // Get skills for this gig
-        const { data: skillLinks } = await supabase
-          .from('skill_gig')
-          .select('skillid')
-          .eq('gigid', gig.gigid);
+        const skills = await getSkillsForEntity(gig.gigid, 'gig');
         
-        let skills: string[] = [];
-        
-        if (skillLinks && skillLinks.length > 0) {
-          const skillIds = skillLinks.map(link => link.skillid);
-          
-          const { data: skillData } = await supabase
-            .from('skill')
-            .select('skillname')
-            .in('skillid', skillIds);
-            
-          skills = skillData?.map(s => s.skillname) || [];
-        }
-
         return {
           gigid: gig.gigid,
           gigtitle: gig.gigtitle || 'Untitled Gig',
@@ -187,15 +178,6 @@ const WorkerGigs = () => {
     }
   };
 
-  // Format budget
-  const formatBudget = (amount: number) => {
-    return new Intl.NumberFormat('en-PK', { 
-      style: 'currency', 
-      currency: 'PKR',
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
   if (error) {
     return (
       <Layout>
@@ -271,7 +253,7 @@ const WorkerGigs = () => {
                   <CardContent>
                     <div className="mb-4">
                       <p className="text-gray-600 mb-2">{gig.gigdescription}</p>
-                      <p className="font-semibold text-workedIn-green">Budget: {formatBudget(gig.gigbudget)}</p>
+                      <p className="font-semibold text-workedIn-green">{formatCurrency(gig.gigbudget)}</p>
                     </div>
                     
                     <div className="mb-4">
@@ -315,7 +297,7 @@ const WorkerGigs = () => {
                                 value={proposedPrice}
                                 onChange={(e) => setProposedPrice(e.target.value)}
                               />
-                              <p className="text-xs text-gray-500 mt-1">Employer's budget: {formatBudget(gig.gigbudget)}</p>
+                              <p className="text-xs text-gray-500 mt-1">Employer's budget: {formatCurrency(gig.gigbudget)}</p>
                             </div>
                             <div>
                               <label className="block text-sm font-medium mb-1">Your Remarks</label>

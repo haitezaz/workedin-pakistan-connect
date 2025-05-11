@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,9 +29,9 @@ interface Job {
 }
 
 const WorkerJobs = () => {
-  const [selectedCity, setSelectedCity] = useState<string>('');
+  const [selectedCity, setSelectedCity] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedJobType, setSelectedJobType] = useState<string>('');
+  const [selectedJobType, setSelectedJobType] = useState<string>('all');
   const [applicationJob, setApplicationJob] = useState<Job | null>(null);
   const [applicationMessage, setApplicationMessage] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -73,11 +72,11 @@ const WorkerJobs = () => {
         .eq('status', 'open');
       
       // Apply filters if selected
-      if (selectedCity) {
+      if (selectedCity && selectedCity !== 'all') {
         query = query.eq('city', selectedCity);
       }
       
-      if (selectedJobType) {
+      if (selectedJobType && selectedJobType !== 'all') {
         query = query.eq('jobtype', selectedJobType);
       }
 
@@ -221,7 +220,7 @@ const WorkerJobs = () => {
                 <SelectValue placeholder="Select City" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Cities</SelectItem>
+                <SelectItem value="all">All Cities</SelectItem>
                 {cities.map(city => (
                   <SelectItem key={city.id} value={city.name}>{city.name}</SelectItem>
                 ))}
@@ -232,7 +231,7 @@ const WorkerJobs = () => {
                 <SelectValue placeholder="Job Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="full-time">Full Time</SelectItem>
                 <SelectItem value="part-time">Part Time</SelectItem>
                 <SelectItem value="contract">Contract</SelectItem>

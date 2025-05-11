@@ -79,49 +79,40 @@ export async function getSkillsForEntity(
   entityId: number, 
   entityType: 'job' | 'gig'
 ): Promise<string[]> {
-  // Define table names as string literals to avoid type inference issues
+  // Define table names explicitly to avoid type inference issues
   const linkTableName = entityType === 'job' ? 'skill_job' : 'skill_gig';
   const idColumnName = entityType === 'job' ? 'jobid' : 'gigid';
   
   try {
-    // Step 1: Get the skill IDs for this entity
+    // Step 1: Get skill links for this entity
     const { data: linkData, error: linkError } = await supabase
       .from(linkTableName)
-      .select('skillid');
+      .select('skillid')
+      .eq(idColumnName, entityId);
     
     if (linkError || !linkData || linkData.length === 0) {
       console.error(`Error fetching ${entityType} skill links:`, linkError);
       return [];
     }
     
-    // Filter to match only the specified entity ID
-    const filteredLinks = linkData.filter(link => 
-      link.skillid !== null && link[idColumnName as keyof typeof link] === entityId
-    );
-    
-    if (filteredLinks.length === 0) {
-      return [];
-    }
-    
     // Step 2: Extract the skill IDs
-    const skillIds = filteredLinks.map(row => row.skillid);
+    const skillIds = linkData.map(link => link.skillid);
     
     // Step 3: Get the skill names
     const { data: skillData, error: skillError } = await supabase
       .from('skill')
-      .select('skillname');
+      .select('*')
+      .in('skillid', skillIds);
     
     if (skillError || !skillData) {
       console.error(`Error fetching skills:`, skillError);
       return [];
     }
     
-    // Step 4: Filter skills by IDs and map to names
-    const matchedSkills = skillData
-      .filter(skill => skillIds.includes(skill.skillid))
-      .map(skill => skill.skillname || '');
-    
-    return matchedSkills.filter(name => name !== '');
+    // Step 4: Map to names
+    return skillData
+      .map(skill => skill.skillname || '')
+      .filter(name => name !== '');
     
   } catch (error) {
     console.error(`Error getting skills for ${entityType} ${entityId}:`, error);

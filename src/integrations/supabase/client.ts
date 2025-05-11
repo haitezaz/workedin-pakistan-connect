@@ -74,45 +74,49 @@ export const formatDate = (dateString: string) => {
   });
 };
 
-// Completely refactored utility to get skills for a specific entity (job or gig)
-// This avoids the excessive type instantiation error
-export async function getSkillsForEntity(entityId: number, entityType: 'job' | 'gig'): Promise<string[]> {
+// Simplified utility to get skills for a specific entity (job or gig)
+// Avoiding type instantiation errors by simplifying the function
+export async function getSkillsForEntity(
+  entityId: number, 
+  entityType: 'job' | 'gig'
+): Promise<string[]> {
+  // Define table names based on entity type to avoid complex type inference
+  const linkTableName = entityType === 'job' ? 'skill_job' : 'skill_gig';
+  const idColumnName = entityType === 'job' ? 'jobid' : 'gigid';
+  
   try {
-    // Determine table name and ID column name based on entity type
-    const tableName = entityType === 'job' ? 'skill_job' : 'skill_gig';
-    const idColumnName = entityType === 'job' ? 'jobid' : 'gigid';
-    
-    // Get skill IDs associated with the entity
-    const { data: linkRows, error: linksError } = await supabase
-      .from(tableName)
+    // Step 1: Get the skill IDs for this entity using a simple string query
+    const linkResult = await supabase
+      .from(linkTableName)
       .select('skillid')
       .eq(idColumnName, entityId);
-    
-    if (linksError) {
-      console.error(`Error fetching ${entityType} skill links:`, linksError);
+      
+    if (linkResult.error) {
+      console.error(`Error fetching ${entityType} skill links:`, linkResult.error);
       return [];
     }
     
-    if (!linkRows || linkRows.length === 0) {
+    if (!linkResult.data || linkResult.data.length === 0) {
       return [];
     }
     
-    // Extract skill IDs from the links
-    const skillIds = linkRows.map(link => link.skillid);
+    // Step 2: Extract the skill IDs
+    const skillIds = linkResult.data.map(row => row.skillid);
     
-    // Get skill names from the skill table
-    const { data: skillData, error: skillsError } = await supabase
+    // Step 3: Get the skill names using a simple query
+    const skillResult = await supabase
       .from('skill')
       .select('skillname')
       .in('skillid', skillIds);
       
-    if (skillsError) {
-      console.error(`Error fetching skills:`, skillsError);
+    if (skillResult.error) {
+      console.error(`Error fetching skills:`, skillResult.error);
       return [];
     }
     
-    // Extract and return skill names
-    return (skillData || []).map(s => s.skillname);
+    // Step 4: Return the skill names as an array of strings
+    return skillResult.data ? skillResult.data.map(s => s.skillname) : [];
+    
   } catch (error) {
     console.error(`Error getting skills for ${entityType} ${entityId}:`, error);
     return [];
